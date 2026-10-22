@@ -1,0 +1,21 @@
+# Entorno virtual
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Variables privadas / claves API
+.env
+
+# Datos generados automáticamente
+datos/*.html
+datos/*.db
