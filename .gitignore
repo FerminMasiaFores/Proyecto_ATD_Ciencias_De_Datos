@@ -17,5 +17,5 @@ __pycache__/
 .env
 
 # Datos generados automáticamente
-datos/*.html
+#datos/*.html
 datos/*.db
