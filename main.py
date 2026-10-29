@@ -1,9 +1,15 @@
 
-import textwrap
 import shutil
+import textwrap
+import requests
 
 from scrapers.yelmo import obtener_peliculas
+from api.tmdb import buscar_pelicula_tmdb
 
+
+# ==========================================
+# CINES DISPONIBLES
+# ==========================================
 
 CINES = {
     "Mercado de Campanar (Valencia)": "mercado-de-campanar-valencia",
@@ -14,7 +20,12 @@ CINES = {
 }
 
 
+# ==========================================
+# SELECCIÓN DE OPCIONES
+# ==========================================
+
 def seleccionar_opcion(cantidad):
+
     while True:
         respuesta = input("\nSelecciona una opción: ").strip()
 
@@ -27,21 +38,97 @@ def seleccionar_opcion(cantidad):
         print("Opción no válida. Inténtalo de nuevo.")
 
 
+# ==========================================
+# FORMATO DE TEXTO
+# ==========================================
+
+def mostrar_sinopsis(sinopsis):
+
+    ancho = min(
+        shutil.get_terminal_size(
+            fallback=(90, 24)
+        ).columns - 4,
+        90
+    )
+
+    ancho = max(30, ancho)
+
+    for parrafo in sinopsis.splitlines():
+        if parrafo.strip():
+            print(textwrap.fill(parrafo, width=ancho))
+        else:
+            print()
+
+
+# ==========================================
+# CONSULTAR INFORMACIÓN DE TMDB
+# ==========================================
+
+def mostrar_valoracion_tmdb(pelicula):
+
+    print("\n--- VALORACIÓN TMDB ---\n")
+
+    try:
+        datos_tmdb = buscar_pelicula_tmdb(
+            pelicula.get("name") or "",
+            pelicula.get("originalName") or "",
+            pelicula.get("releaseDate") or ""
+        )
+
+        if datos_tmdb is None:
+            print("No se ha encontrado una coincidencia fiable en TMDb.")
+            return
+
+        valoracion = datos_tmdb.get("vote_average") or 0
+        votos = datos_tmdb.get("vote_count") or 0
+        identificador = datos_tmdb.get("id")
+
+        if votos > 0:
+            print(f"Valoración: {valoracion:.1f}/10")
+            print(f"Número de votos: {votos}")
+        else:
+            print("Esta película todavía no tiene valoraciones.")
+
+        if identificador:
+            print(
+                "Ficha TMDb: "
+                f"https://www.themoviedb.org/movie/{identificador}"
+            )
+
+    except (requests.RequestException, RuntimeError, ValueError) as error:
+        print("No se ha podido consultar TMDb.")
+        print("Detalle:", error)
+
+
+# ==========================================
+# MOSTRAR INFORMACIÓN DE UNA PELÍCULA
+# ==========================================
+
 def mostrar_pelicula(pelicula):
-    print("\n" + "=" * 45)
-    print("          INFORMACIÓN DE LA PELÍCULA")
-    print("=" * 45)
+
+    print("\n" + "=" * 50)
+    print("           INFORMACIÓN DE LA PELÍCULA")
+    print("=" * 50)
 
     generos = pelicula.get("genre") or []
     idiomas = pelicula.get("languages") or []
     formatos = pelicula.get("formats") or []
 
-    print("Título:", pelicula.get("name") or "No disponible")
-    print("Título original:", pelicula.get("originalName") or "No disponible")
+    titulo = pelicula.get("name") or "No disponible"
+    titulo_original = pelicula.get("originalName") or "No disponible"
+    duracion = pelicula.get("length") or "No disponible"
+    clasificacion = pelicula.get("rating") or "No disponible"
+    estreno = pelicula.get("releaseDate") or "No disponible"
+
+    if estreno != "No disponible":
+        estreno = estreno[:10]
+
+    print("\nTítulo:", titulo)
+    print("Título original:", titulo_original)
     print("Género:", ", ".join(generos) or "No disponible")
-    print("Duración:", pelicula.get("length") or "No disponible")
-    print("Clasificación:", pelicula.get("rating") or "No disponible")
-    print("Estreno:", pelicula.get("releaseDate") or "No disponible")
+    print("Duración:", duracion)
+    print("Clasificación por edades:", clasificacion)
+    print("Fecha de estreno:", estreno)
     print("Idiomas:", ", ".join(idiomas) or "No disponible")
     print("Formatos:", ", ".join(formatos) or "No disponible")
 
@@ -49,38 +136,34 @@ def mostrar_pelicula(pelicula):
 
     sinopsis = pelicula.get("synopsis") or "No disponible"
 
-    # Detectar el ancho de la terminal
-    ancho = min(
-        shutil.get_terminal_size(fallback=(90, 24)).columns - 4,
-        90
-    )
-    ancho = max(30, ancho)
+    mostrar_sinopsis(sinopsis)
 
-    # Dividir la sinopsis en líneas legibles
-    for parrafo in sinopsis.splitlines():
-        if parrafo.strip():
-            print(textwrap.fill(parrafo, width=ancho))
-        else:
-            print()
+    # Información adicional de TMDb
+    mostrar_valoracion_tmdb(pelicula)
 
-    print("\nValoración TMDb: pendiente de integrar")
-    print("=" * 45)
+    print("\n" + "=" * 50)
 
+
+# ==========================================
+# PROGRAMA PRINCIPAL
+# ==========================================
 
 def main():
+
     while True:
-        print("\n" + "=" * 45)
-        print("                  CINEDATA")
-        print("=" * 45)
+
+        print("\n" + "=" * 50)
+        print("                    CINEDATA")
+        print("=" * 50)
 
         nombres_cines = list(CINES.keys())
 
-        print("\n--- SELECCIONAR CINE ---")
+        print("\n--- SELECCIONAR CINE ---\n")
 
         for indice, nombre in enumerate(nombres_cines, start=1):
             print(f"{indice}. {nombre}")
 
-        print("0. Salir")
+        print("\n0. Salir")
 
         opcion_cine = seleccionar_opcion(len(nombres_cines))
 
@@ -93,6 +176,7 @@ def main():
 
         print(f"\nConsultando películas de {nombre_cine}...")
 
+        # Consultar API de Yelmo
         datos = obtener_peliculas(identificador)
 
         if not datos:
@@ -115,13 +199,17 @@ def main():
             print("No se han encontrado películas.")
             continue
 
-        # Menú de películas
-        while True:
-            print("\n" + "=" * 45)
-            print(f"CINE: {nombre_cine}")
-            print("=" * 45)
+        # ==========================================
+        # MENÚ DE PELÍCULAS
+        # ==========================================
 
-            print("\n--- PELÍCULAS DISPONIBLES ---")
+        while True:
+
+            print("\n" + "=" * 50)
+            print(f"CINE: {nombre_cine}")
+            print("=" * 50)
+
+            print("\n--- PELÍCULAS DISPONIBLES ---\n")
 
             for indice, pelicula in enumerate(peliculas, start=1):
                 print(f"{indice}. {pelicula['name']}")
@@ -137,8 +225,12 @@ def main():
 
             mostrar_pelicula(pelicula)
 
-            input("\nPulsa INTRO para volver a las películas...")
+            input("\nPulsa INTRO para volver al listado de películas...")
 
+
+# ==========================================
+# INICIAR PROGRAMA
+# ==========================================
 
 if __name__ == "__main__":
     main()

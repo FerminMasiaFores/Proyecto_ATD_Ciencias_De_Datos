@@ -1,9 +1,16 @@
+import os
 from curl_cffi import requests
-
+from dotenv import load_dotenv
 
 URL = "https://api-g.cinepolis.com/v2/billboards/graphql"
 
-API_KEY = "lQM6Mkvri1iHksKKCfpAiwGXq0YUZA7Nn6XAXRPr4i13LwXo"
+load_dotenv()
+
+API_KEY = os.getenv("YELMO_API_KEY")
+
+if not API_KEY:
+    raise RuntimeError("No se ha encontrado la API key de Yelmo en .env")
+
 
 
 QUERY = """
