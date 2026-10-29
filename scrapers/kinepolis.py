@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 
 
-URL = "https://www.yelmocines.es/"
+URL = "https://www.yelmocines.es/cartelera/valencia/yelmo-cines-mercado-de-campanar"
 
 
 def descargar_pagina():

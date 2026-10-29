@@ -1,0 +1,18 @@
+curl --url 'https://api-g.cinepolis.com/v2/billboards/graphql' \
+  -H 'accept: */*' \
+  -H 'accept-language: es-ES,es;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'country-id: ES' \
+  -H 'language: ES' \
+  -H 'origin: https://cineyelmo.com' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://cineyelmo.com/' \
+  -H 'sec-ch-ua: "Not:A-Brand";v="8", "Chromium";v="156", "Google Chrome";v="156"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36' \
+  -H 'x-apikey: [OCULTO] \
+  --data-raw $'{"operationName":"Movies","variables":{"category":"now-playing","cinemas":"","limit":100,"countryId":"ES","isAbsoluteMediaPath":true},"query":"query Movies($countryId: String\u0021, $category: String, $cinemas: String, $after: String, $limit: Int, $isAbsoluteMediaPath: Boolean) {\\n  movies(\\n    countryId: $countryId\\n    category: $category\\n    cinemas: $cinemas\\n    after: $after\\n    limit: $limit\\n    isAbsoluteMediaPath: $isAbsoluteMediaPath\\n  ) {\\n    pageInfo {\\n      startCursor\\n      endCursor\\n      hasNextPage\\n      hasPreviousPage\\n      __typename\\n    }\\n    totalCount\\n    edges {\\n      cursor\\n      node {\\n        id\\n        type\\n        countryId\\n        name\\n        originalName\\n        distributor\\n        rating\\n        ratingDescription\\n        position\\n        genre\\n        synopsis\\n        length\\n        availableForSale\\n        alerts {\\n          title\\n          message\\n          __typename\\n        }\\n        releaseDate\\n        languages\\n        formats\\n        tags {\\n          name\\n          resource\\n          __typename\\n        }\\n        media {\\n          resource\\n          type\\n          code\\n          sizes {\\n            large\\n            medium\\n            small\\n            __typename\\n          }\\n          __typename\\n        }\\n        cities\\n        cinemas\\n        categories\\n        experiences {\\n          icon\\n          name\\n          __typename\\n        }\\n        __typename\\n      }\\n      __typename\\n    }\\n    __typename\\n  }\\n}"}'
