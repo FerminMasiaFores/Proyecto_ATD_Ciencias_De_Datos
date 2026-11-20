@@ -5,7 +5,7 @@ import requests
 
 from scrapers.yelmo import obtener_peliculas
 from api.tmdb import buscar_pelicula_tmdb
-from scrapers.abc import obtener_peliculas as obtener_peliculas_abc
+
 
 # ==========================================
 # CINES DISPONIBLES
