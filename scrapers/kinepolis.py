@@ -9,10 +9,24 @@ import requests
 # CONFIGURACIÓN
 # ==========================================
 
-# Petición de la web de Kinépolis que devuelve sesiones y películas.
-# Se copia desde la pestaña "Red" del navegador. Si se deja vacía
-# o la descarga falla, se usa el JSON guardado en la carpeta datos.
-URL_CARTELERA = ""
+# Kinépolis no tiene un enlace aparte para la cartelera: las sesiones
+# y las películas van metidas dentro del HTML de la página principal,
+# en el script "jQuery.extend(Drupal.settings, {...})".
+# Si la descarga falla, se usa el JSON guardado en la carpeta datos.
+URL_CARTELERA = "https://kinepolis.es/"
+
+# Texto que marca dónde empiezan los datos dentro del HTML
+# (en la página hay varios Drupal.settings, solo uno los lleva)
+MARCADOR = '"current_movies":'
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/156.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "es-ES,es;q=0.9"
+}
 
 ARCHIVO_LOCAL = (
     Path(__file__).resolve().parent.parent
@@ -27,15 +41,38 @@ _cartelera = None
 # CARGAR LA CARTELERA
 # ==========================================
 
+def _extraer_cartelera(html):
+
+    # Buscar dónde empiezan los datos y la llave "{" que los abre.
+    # Si no está, index() lanza ValueError.
+    inicio = html.index("{", html.index(MARCADOR))
+
+    # raw_decode lee un único objeto JSON desde esa posición
+    # y se para donde termina, sin tener que buscar el cierre
+    datos, _ = json.JSONDecoder().raw_decode(html, inicio)
+
+    return datos
+
+
 def _descargar_cartelera():
 
-    respuesta = requests.get(URL_CARTELERA, timeout=20)
+    print("Descargando la cartelera de", URL_CARTELERA)
+
+    respuesta = requests.get(URL_CARTELERA, headers=HEADERS, timeout=30)
 
     print("Código HTTP (Kinépolis):", respuesta.status_code)
 
     respuesta.raise_for_status()
 
-    return respuesta.json()
+    return _extraer_cartelera(respuesta.text)
+
+
+def _guardar_archivo_local(datos):
+
+    # Guardamos la última cartelera descargada para tener
+    # una copia si otro día la web no responde
+    with open(ARCHIVO_LOCAL, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False)
 
 
 def _leer_archivo_local():
@@ -56,14 +93,14 @@ def cargar_cartelera():
     datos = None
 
     # 1) Intentar descargarla de la web
-    if URL_CARTELERA:
-        try:
-            datos = _descargar_cartelera()
+    try:
+        datos = _descargar_cartelera()
+        _guardar_archivo_local(datos)
 
-        except (requests.RequestException, ValueError) as error:
-            print("No se ha podido descargar la cartelera:", error)
+    except (requests.RequestException, ValueError, KeyError) as error:
+        print("No se ha podido descargar la cartelera:", error)
 
-    # 2) Si no se puede, leer el JSON guardado desde el navegador
+    # 2) Si no se puede, leer la última copia guardada
     if datos is None:
         datos = _leer_archivo_local()
 

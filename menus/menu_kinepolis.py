@@ -170,7 +170,7 @@ def main():
             )
 
             for indice, pelicula in enumerate(peliculas, start=1):
-                print(f"{indice}. {pelicula['titulo']}")
+                print(f"{indice}. {pelicula['titulo']}  ")
 
             print("\n0. Volver a cines")
 
