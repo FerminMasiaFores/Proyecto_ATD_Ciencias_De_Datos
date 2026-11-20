@@ -5,7 +5,6 @@ import time
 
 
 
-from api.tmdb import buscar_pelicula_tmdb
 
 
 # ==================================================
@@ -182,27 +181,6 @@ def extraer_cartelera(data, cine):
         if evento.get("EsPelicula") is False:
             continue
 
-        # Consultar valoración en TMDB
-        valoracion = None
-
-        try:
-            datos_tmdb = buscar_pelicula_tmdb(
-                titulo,
-                titulo,
-                ""
-            )
-
-            if datos_tmdb:
-                votos = datos_tmdb.get("vote_count", 0)
-
-                if votos and votos > 0:
-                    valoracion = {
-                        "puntuacion": datos_tmdb.get("vote_average"),
-                        "votos": votos
-                    }
-
-        except (requests.RequestException, RuntimeError, ValueError) as error:
-            print("No se pudo consultar TMDB:", error)
 
         sesiones = []
 
@@ -245,8 +223,6 @@ def extraer_cartelera(data, cine):
                 ]
             )),
         }
-
-        lista_peliculas.append(pelicula)
 
         lista_peliculas.append(pelicula)
 

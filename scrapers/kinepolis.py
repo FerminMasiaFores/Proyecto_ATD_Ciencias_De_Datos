@@ -1,8 +1,11 @@
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import requests
+import os
+import tempfile
 
 
 # ==========================================
@@ -67,12 +70,56 @@ def _descargar_cartelera():
     return _extraer_cartelera(respuesta.text)
 
 
+
+# ==========================================
+# GUARDAR COPIA LOCAL DE FORMA SEGURA
+# ==========================================
+
 def _guardar_archivo_local(datos):
 
-    # Guardamos la última cartelera descargada para tener
-    # una copia si otro día la web no responde
-    with open(ARCHIVO_LOCAL, "w", encoding="utf-8") as f:
-        json.dump(datos, f, ensure_ascii=False)
+    ARCHIVO_LOCAL.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    archivo_temporal = None
+
+    try:
+        # Escribir primero en un archivo temporal.
+        # Así no dañamos el JSON anterior si
+        # se interrumpe la escritura.
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=ARCHIVO_LOCAL.parent,
+            suffix=".tmp",
+            delete=False
+        ) as archivo:
+
+            archivo_temporal = Path(archivo.name)
+
+            json.dump(
+                datos,
+                archivo,
+                ensure_ascii=False
+            )
+
+        # Sustituir el JSON anterior solo cuando
+        # el archivo nuevo está completamente escrito.
+        os.replace(
+            archivo_temporal,
+            ARCHIVO_LOCAL
+        )
+
+    finally:
+
+        if (
+            archivo_temporal is not None
+            and archivo_temporal.exists()
+        ):
+            archivo_temporal.unlink()
+
 
 
 def _leer_archivo_local():
@@ -83,33 +130,154 @@ def _leer_archivo_local():
         return json.load(f)
 
 
+# ==========================================
+# VALIDAR DATOS DESCARGADOS
+# ==========================================
+
+def _validar_cartelera(datos):
+
+    if not isinstance(datos, dict):
+        raise ValueError(
+            "La cartelera no es un diccionario."
+        )
+
+    peliculas = datos.get("films")
+    sesiones = datos.get("sessions")
+
+    if not isinstance(peliculas, list):
+        raise ValueError(
+            "Falta la lista de películas."
+        )
+
+    if not isinstance(sesiones, list):
+        raise ValueError(
+            "Falta la lista de sesiones."
+        )
+
+    if not peliculas:
+        raise ValueError(
+            "La descarga no contiene películas."
+        )
+
+    if not sesiones:
+        raise ValueError(
+            "La descarga no contiene sesiones."
+        )
+
+    # Verificar que los datos tienen una
+    # estructura reconocible.
+
+    peliculas_validas = any(
+        isinstance(pelicula, dict)
+        and pelicula.get("id")
+        and pelicula.get("title")
+        for pelicula in peliculas
+    )
+
+    sesiones_validas = any(
+        isinstance(sesion, dict)
+        and sesion.get("showtime")
+        and sesion.get("complexOperator")
+        for sesion in sesiones
+    )
+
+    if not peliculas_validas or not sesiones_validas:
+        raise ValueError(
+            "La cartelera tiene una estructura inválida."
+        )
+
+    return {
+        "peliculas": peliculas,
+        "sesiones": sesiones
+    }
+
+
+# ==========================================
+# FORZAR ACTUALIZACIÓN DESDE LA WEB
+# ==========================================
+
+def actualizar_cartelera():
+
+    global _cartelera
+
+    print("\nActualizando cartelera Kinépolis...")
+
+    # Descargar desde la web sin utilizar
+    # la memoria caché ni el JSON local.
+    datos = _descargar_cartelera()
+
+    # Validar antes de sustituir nada.
+    cartelera_nueva = _validar_cartelera(
+        datos
+    )
+
+    # Guardar la nueva copia local.
+    _guardar_archivo_local(datos)
+
+    # Actualizar los datos en memoria.
+    _cartelera = cartelera_nueva
+
+    print("Cartelera Kinépolis actualizada.")
+
+    print(
+        "Películas:",
+        len(_cartelera["peliculas"])
+    )
+
+    print(
+        "Sesiones:",
+        len(_cartelera["sesiones"])
+    )
+
+    return _cartelera
+
+
+
+# ==========================================
+# CARGAR CARTELERA CON RESPALDO LOCAL
+# ==========================================
+
 def cargar_cartelera():
 
     global _cartelera
 
+    # 1. Reutilizar los datos de memoria
+    # si ya están cargados.
     if _cartelera is not None:
         return _cartelera
 
-    datos = None
-
-    # 1) Intentar descargarla de la web
+    # 2. Intentar una descarga nueva.
     try:
-        datos = _descargar_cartelera()
-        _guardar_archivo_local(datos)
+        return actualizar_cartelera()
 
-    except (requests.RequestException, ValueError, KeyError) as error:
-        print("No se ha podido descargar la cartelera:", error)
+    except (
+        requests.RequestException,
+        ValueError,
+        KeyError,
+        OSError
+    ) as error:
 
-    # 2) Si no se puede, leer la última copia guardada
-    if datos is None:
-        datos = _leer_archivo_local()
+        print(
+            "\nNo se pudo actualizar Kinépolis:",
+            error
+        )
 
-    _cartelera = {
-        "sesiones": datos.get("sessions") or [],
-        "peliculas": datos.get("films") or []
-    }
+        print(
+            "Intentando utilizar la última "
+            "copia local..."
+        )
+
+    # 3. Utilizar el respaldo si falla la web.
+    datos = _leer_archivo_local()
+
+    _cartelera = _validar_cartelera(
+        datos
+    )
+
+    print("Cartelera cargada desde el respaldo.")
 
     return _cartelera
+
 # ==========================================
 # LIMPIEZA DE DATOS
 # ==========================================
@@ -133,23 +301,47 @@ SUBTITULOS = {
 }
 
 
+
+# ==========================================
+# FECHAS Y HORAS DE LAS SESIONES
+# ==========================================
+
+ZONA_HORARIA = ZoneInfo("Europe/Madrid")
+
+
 def _hora_sesion(sesion):
 
-    # La hora viene como "2026-11-13T16:00:00+00:00".
-    # Nos quedamos con la fecha y la hora tal cual.
-    return datetime.fromisoformat(sesion["showtime"][:19])
+    # Kinépolis proporciona fechas con zona horaria.
+    texto = sesion["showtime"].replace(
+        "Z",
+        "+00:00"
+    )
+
+    fecha = datetime.fromisoformat(texto)
+
+    if fecha.tzinfo is None:
+        raise ValueError(
+            "La sesión no tiene información "
+            "de zona horaria."
+        )
+
+    # Convertir a la hora española
+    return fecha.astimezone(ZONA_HORARIA)
 
 
 def _sesiones_futuras(cine):
 
-    ahora = datetime.now()
+    ahora = datetime.now(ZONA_HORARIA)
+
+    sesiones = cargar_cartelera()["sesiones"]
 
     return [
         sesion
-        for sesion in cargar_cartelera()["sesiones"]
+        for sesion in sesiones
         if sesion.get("complexOperator") == cine
         and _hora_sesion(sesion) >= ahora
     ]
+
 
 
 def _version(atributos):

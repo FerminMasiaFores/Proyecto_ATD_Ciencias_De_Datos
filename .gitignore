@@ -1,11 +1,13 @@
+
 # Entorno virtual
 .venv/
 venv/
 
+
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+.pytest_cache/
 
 # PyCharm
 .idea/
@@ -13,8 +15,12 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Variables privadas / claves API
-
-# Datos generados automáticamente
-#datos/*.html
+# Base de datos y archivos generados
 datos/*.db
+datos/*.db-journal
+datos/*.db-wal
+datos/*.db-shm
+datos/*.html
+
+# Archivos temporales
+*.log
